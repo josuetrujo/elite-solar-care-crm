@@ -1,0 +1,15 @@
+{
+  "name": "Elite Solar Care CRM",
+  "short_name": "Elite CRM",
+  "description": "Customers, calls, scheduling and invoicing for Elite Solar Care LLC.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#004AAD",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

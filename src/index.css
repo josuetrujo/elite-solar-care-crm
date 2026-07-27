@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body {
+  @apply bg-slate-50 text-slate-700 antialiased;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+@layer components {
+  /* Buttons — 40px tap target, rounded-md, soft transitions */
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 h-10 text-sm font-semibold transition active:scale-[0.97]; }
+  .btn-primary { @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700; }
+  .btn-ghost { @apply btn bg-white border border-slate-200 text-slate-700 hover:bg-slate-50; }
+  .btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700; }
+  .btn-amber { @apply btn bg-amber-500 text-amber-950 hover:bg-amber-400; }
+
+  /* Inputs */
+  .input { @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-600/25 outline-none transition; }
+  .label { @apply block text-xs font-semibold uppercase tracking-[0.06em] text-slate-500 mb-1; }
+
+  /* Cards — rounded-xl, soft float */
+  .card { @apply bg-white rounded-xl border border-slate-200 shadow-card; }
+
+  /* Brand display type (logo-adjacent headings) */
+  .font-display { font-family: 'Montserrat', system-ui, sans-serif; }
+}

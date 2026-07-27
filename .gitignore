@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Secrets — NEVER commit these
+.env
+.env.local
+.env.*.local
+
+# Real customer data must never be committed (privacy)
+data/customers*.xlsx
+data/customers*.csv
+*.local.xlsx
+# one-off merge script embeds a few real contacts' notes/PII — keep out of git
+scripts/merge-hubspot.mjs
+# large design-system handoff export (keep the small claude-design-pack only)
+design/exported/
+# receipts / PDFs may contain real customer names — never commit
+*.pdf
+# internal audit prompts reference local machine paths — keep them off the public repo
+CODEX-REVIEW-PROMPT*.md
+
+# OS / editor
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# Vite local temp files
+vite.config.js.timestamp-*
+vite.config.*.timestamp-*
