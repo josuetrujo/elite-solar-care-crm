@@ -16,3 +16,24 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </HashRouter>
   </React.StrictMode>
 )
+
+// Service worker: makes the app open with no signal. Only in a real build —
+// during `npm run dev` it would cache half-built files and cause confusion.
+// Escape hatch: open the site with ?nosw to unregister it.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  const bypass = new URLSearchParams(window.location.search).has('nosw')
+  window.addEventListener('load', async () => {
+    try {
+      if (bypass) {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(regs.map((r) => r.unregister()))
+        return
+      }
+      const base = import.meta.env.BASE_URL || './'
+      await navigator.serviceWorker.register(`${base}sw.js`, { scope: base })
+    } catch (e) {
+      // Offline support is a bonus — never let it break the app.
+      console.warn('Service worker not registered:', e?.message)
+    }
+  })
+}

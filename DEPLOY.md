@@ -33,21 +33,27 @@ Go to **https://github.com** → Sign up. Use your email. Free plan is fine.
 
 ---
 
-## Step 2 — Save the project to GitHub
+## Step 2 — One-time cleanup (30 seconds)
 
-Open Terminal and copy-paste these lines **one at a time**, pressing Enter after each.
+I already set up version control for you and made the first commit — every file in the
+project is saved. But I set it up from the cloud, which isn't allowed to delete files on
+your Mac, so it left a few empty "lock" files behind. Git will refuse to run until they're
+gone.
+
+Open Terminal (Cmd + Space → type **Terminal** → Enter) and paste this **one line**:
 
 ```
-cd "/Users/josuetrujo/Claude/Projects/Elite Solar Care"
+cd "/Users/josuetrujo/Claude/Projects/Elite Solar Care" && rm -f .git/index.lock .git/refs/heads/*.lock && find .git/objects -name 'tmp_obj_*' -delete && git branch -M main && git add -A && git commit -m "docs" && git status
 ```
 
-```
-git add -A && git commit -m "CRM updates"
-```
+The last two lines should read `On branch main` and `nothing to commit, working tree clean`.
+That's the green light — everything below will work.
 
-*(If it says "nothing to commit", that's fine — it just means nothing changed.)*
+---
 
-Now create the online copy. Go to **https://github.com/new** in your browser:
+## Step 3 — Put the project on GitHub
+
+Create the online copy. Go to **https://github.com/new** in your browser:
 
 - **Repository name:** `elite-solar-care-crm`
 - **Public** (see the note above)
@@ -62,14 +68,14 @@ git remote add origin https://github.com/YOUR-USERNAME/elite-solar-care-crm.git
 ```
 
 ```
-git branch -M main && git push -u origin main
+git push -u origin main
 ```
 
 It will ask you to sign in to GitHub in your browser. Do that, and the upload finishes.
 
 ---
 
-## Step 3 — Give the website your database keys
+## Step 4 — Give the website your database keys
 
 The website needs to know how to reach your Supabase database.
 
@@ -87,7 +93,24 @@ The website needs to know how to reach your Supabase database.
 
 ---
 
-## Step 4 — Turn the website on
+## Step 4b — Let password-reset emails work
+
+In Supabase → **Authentication** → **URL Configuration** → **Redirect URLs**, add
+both of these (replace YOUR-USERNAME):
+
+```
+https://YOUR-USERNAME.github.io/elite-solar-care-crm/**
+http://localhost:5173/**
+```
+
+Without this, the "forgot my password" link will open the CRM but refuse to save
+the new password. While you're in Supabase, also switch on **Authentication →
+Attack Protection → Leaked password protection**. Both are explained in
+`ACCOUNTS-AND-SECURITY.md`.
+
+---
+
+## Step 5 — Turn the website on
 
 1. Still in **Settings**, left menu → **Pages**.
 2. Under **Build and deployment → Source**, choose **GitHub Actions**.
@@ -104,7 +127,7 @@ Open it, log in with your Supabase email and password, and your real customers l
 
 ---
 
-## Step 5 — Put the icon on your phone's home screen
+## Step 6 — Put the icon on your phone's home screen
 
 **iPhone:** open the address in Safari → tap the **Share** button (square with an arrow)
 → scroll down → **Add to Home Screen** → **Add**.
@@ -112,7 +135,8 @@ Open it, log in with your Supabase email and password, and your real customers l
 **Android:** open it in Chrome → tap the **⋮** menu → **Add to Home screen**.
 
 You now have an Elite Solar Care icon that opens straight into the CRM, full screen,
-with no browser bars.
+with no browser bars. It also opens when you have no signal — and any call outcomes
+you log offline upload themselves as soon as you're back in range.
 
 ---
 
@@ -137,10 +161,10 @@ Two minutes later the website updates itself. Nothing else to do.
 - **"git: command not found"** → In Terminal run `xcode-select --install`, click through
   the installer, then try again.
 - **The Actions job is red** → Click into it and read the last red line. Usually it means
-  a secret in Step 3 was pasted with a stray space or quote mark. Fix it and, on the
+  a secret in Step 4 was pasted with a stray space or quote mark. Fix it and, on the
   Actions tab, click **Re-run jobs**.
 - **The page loads but says "Loading…" forever** → The two secrets are missing or wrong.
-  Redo Step 3, then re-run the job.
+  Redo Step 4, then re-run the job.
 - **"Page not found" right after the first deploy** → Give it 2–3 minutes; GitHub is still
   publishing. Then hard-refresh (Cmd+Shift+R).
 - **Anything else** → Tell me exactly what you see on screen and I'll sort it out.

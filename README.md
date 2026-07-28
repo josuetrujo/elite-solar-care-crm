@@ -40,7 +40,17 @@ To stop the app: press **Ctrl + C** in the terminal.
   as PDF with no extra software. Completing a booked cleaning raises the invoice for you.
 - **Consent tracking** — SMS/email opt-in checkboxes (required by law before messaging).
 - **Settings** — shows which connections are on/off and your role.
-- **Logins & roles** — admin / member / viewer (turn on with Supabase, step 3).
+- **Accounts & crew** — sign in, forgot-password by email, and an approval gate:
+  a brand-new account can see *nothing at all* until an admin approves it in
+  Settings → Team. Roles: admin / member / viewer.
+- **Photos** — before/after shots per customer, shrunk on the phone before upload,
+  stored privately and shown through short-lived signed links.
+- **Reports** — money collected by month, average job, calls per sale, and where
+  the list stands.
+- **Clean up list** (admin) — merges contacts entered twice, and parks the ones
+  with no dialable number so they stop clogging the call queue.
+- **Works with no signal** — the app opens offline and call outcomes are saved on
+  the phone, then uploaded automatically when signal returns.
 - **Card payments & reminders** — wired up but OFF until you add keys
   (see **PAYMENTS-AND-REMINDERS.md**).
 
@@ -50,13 +60,14 @@ To stop the app: press **Ctrl + C** in the terminal.
 |---|---|
 | `START-HERE.md` | Opening the CRM on your Mac, day to day |
 | `DEPLOY.md` | Putting the CRM online so it works on your phone |
+| `ACCOUNTS-AND-SECURITY.md` | Adding your crew, roles, password resets, keeping the list private |
 | `PAYMENTS-AND-REMINDERS.md` | Turning on Square payments and SMS/email reminders |
 
 ---
 
 ## 3. Turn on the real cloud database + logins (Supabase) — free
 
-This gives you real accounts, permissions, and your full **1,511-customer** list in the cloud.
+This gives you real accounts, permissions, and your full **1,521-contact** list in the cloud.
 
 1. Create a free project at **https://supabase.com** (New project; pick a strong database password; wait ~2 min).
 2. In the project: left menu → **SQL Editor** → **New query**. Open the file `supabase/schema.sql` from this project, copy everything, paste, and click **Run**. (This creates the tables and security rules.)
@@ -69,10 +80,13 @@ This gives you real accounts, permissions, and your full **1,511-customer** list
 5. Stop the app (Ctrl+C) and run `npm run dev` again. It now uses the cloud. Sign up with your email — that's your login.
 6. **Make yourself the admin:** Supabase → SQL Editor → run (use your email):
    ```sql
-   update profiles set role = 'admin' where email = 'you@example.com';
+   update profiles set role = 'admin', approved = true, approved_at = now()
+   where email = 'you@example.com';
    ```
+   Everyone after you signs up in the app and waits for you to approve them under
+   **Settings → Team** — see `ACCOUNTS-AND-SECURITY.md`.
 
-### Import your 1,511 customers
+### Import your contact list
 1. Get a **service role** key: Supabase → Project Settings → API → `service_role` (secret). Use it only locally.
 2. Run (point it at the master list in your vault):
    ```bash
@@ -114,14 +128,22 @@ or Hostinger with no extra config.
 ## Project structure
 ```
 src/
-  data/        # local demo + Supabase data providers (auto-selected)
-  lib/         # config/feature-flags, supabase, pricing, square, notifications, receipt
+  data/        # local demo + Supabase data providers (auto-selected) + read cache
+  lib/         # config/feature-flags, supabase, pricing, square, notifications,
+               # receipt, phone, images, offline outbox
   context/     # auth (login + roles)
   components/  # layout, nav, status badge
-  pages/       # Dashboard, Customers, CustomerDetail, Schedule, Invoices, Settings
+  pages/       # Dashboard, Call Mode, Leads, Callbacks, Customers, CustomerDetail,
+               # Schedule, Invoices, Reports, Cleanup, Settings, Login, ResetPassword
+public/sw.js                     # service worker — lets the app open with no signal
 supabase/schema.sql              # database + permissions (run once in Supabase)
 supabase/functions/              # server-side: Square invoices, SMS/email reminders
 scripts/import-customers.mjs     # load the master list into Supabase
+```
+
+## Tests
+```bash
+npm test     # checks the offline outbox: nothing logged without signal is ever lost
 ```
 
 ## Need help?

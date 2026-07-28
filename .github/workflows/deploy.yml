@@ -4,7 +4,7 @@ name: Deploy CRM to GitHub Pages
 # from the repo's Actions tab (Run workflow).
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:

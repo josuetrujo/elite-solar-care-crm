@@ -18,10 +18,12 @@ export default function DispositionBar({ customer, onDone }) {
   async function apply(key, extra = {}) {
     setBusy(true)
     try {
-      await logDisposition(customer, key, { note, ...extra })
+      const res = await logDisposition(customer, key, { note, ...extra })
       setNote('')
       setModal(null)
-      onDone && onDone()
+      // res.queued means there was no signal — it's saved on the phone and
+      // will go up on its own. Either way the call was NOT lost, so move on.
+      onDone && onDone(res)
     } catch (e) { alert(e.message) } finally { setBusy(false) }
   }
 

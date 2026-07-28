@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Phone, SkipForward, RotateCcw, ExternalLink, PartyPopper, MapPin, Sun } from 'lucide-react'
 import { db } from '../data'
 import { segmentOf } from '../lib/segments'
+import { usablePhone, formatPhone } from '../lib/phone'
 import { fmtDate } from '../lib/dates'
 import { dispositionLabel } from '../lib/config'
 import { useAuth } from '../context/AuthContext'
@@ -14,9 +15,12 @@ import DispositionBar from '../components/DispositionBar'
 //   3) everyone else: fewest attempts, then oldest last-call first
 function buildQueue(customers) {
   const endToday = new Date(); endToday.setHours(23, 59, 59, 999)
-  // Leads only — and don't serve someone whose callback is promised for a future day.
+  // Leads only — skip anyone we can't actually dial (those live in Clean up the
+  // list), and don't serve someone whose callback is promised for a future day.
   const leads = customers.filter((c) =>
-    segmentOf(c) === 'lead' && !(c.callback_at && new Date(c.callback_at) > endToday))
+    segmentOf(c) === 'lead'
+    && usablePhone(c.phone)
+    && !(c.callback_at && new Date(c.callback_at) > endToday))
   const bucket = (c) => {
     if (c.callback_at && new Date(c.callback_at) <= endToday) return 0
     if (!c.call_attempts) return 1
@@ -108,7 +112,7 @@ export default function CallMode() {
           <a href={`tel:${c.phone}`} className="flex items-center justify-center gap-3 w-full rounded-xl bg-brand-600 text-white py-3.5 shadow-brand hover:bg-brand-700 transition active:scale-[0.99]">
             <Phone size={22} />
             <span className="text-left leading-tight">
-              <span className="block text-lg font-bold">{c.phone}</span>
+              <span className="block text-lg font-bold">{formatPhone(c.phone)}</span>
               <span className="block text-xs text-brand-100">Tap to call</span>
             </span>
           </a>

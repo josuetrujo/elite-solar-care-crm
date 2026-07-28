@@ -11,6 +11,7 @@ import { segmentOf } from '../lib/segments'
 import { SEGMENTS } from '../lib/config'
 import DispositionBar from '../components/DispositionBar'
 import CallHistory from '../components/CallHistory'
+import JobPhotos from '../components/JobPhotos'
 import { useAuth } from '../context/AuthContext'
 
 const FIELD = (label, node) => (
@@ -54,8 +55,17 @@ export default function CustomerDetail() {
   const set = (k, v) => { setC({ ...c, [k]: v }); setSaved(false) }
 
   async function save() {
-    const patch = { ...c }
-    delete patch.id; delete patch.created_at; delete patch.updated_at
+    // Only send the fields this page actually edits. Sending the whole row back
+    // would overwrite call-tracking columns with whatever they were when the
+    // page loaded — quietly undoing a call logged from another tab or phone.
+    const EDITABLE = [
+      'first_name', 'last_name', 'email', 'phone', 'street_address', 'city', 'state', 'zip',
+      'property_type', 'panel_count', 'stories', 'roof_type', 'lead_source', 'status',
+      'quoted_amount', 'recurring_frequency', 'next_service_due',
+      'consent_sms', 'consent_email', 'do_not_call', 'bad_number', 'notes',
+    ]
+    const patch = {}
+    for (const k of EDITABLE) if (k in c) patch[k] = c[k]
     if (c.first_name || c.last_name) patch.full_name = [c.first_name, c.last_name].filter(Boolean).join(' ')
     await db.updateCustomer(id, patch)
     setSaved(true)
@@ -388,6 +398,9 @@ export default function CustomerDetail() {
           </ul>
         )}
       </div>
+
+      {/* Photos */}
+      <JobPhotos customerId={id} jobs={jobs} />
 
       {/* Invoices & receipts */}
       <div className="card p-5">

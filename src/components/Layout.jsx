@@ -1,9 +1,10 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, PhoneCall, Phone, Users, CalendarClock, CalendarDays, Receipt, Settings as Cog, ListFilter, LogOut, Menu } from 'lucide-react'
+import { LayoutDashboard, PhoneCall, Phone, Users, CalendarClock, CalendarDays, Receipt, Settings as Cog, ListFilter, LogOut, Menu, BarChart3, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { APP_NAME } from '../lib/config'
 import logo from '../assets/logo.png'
+import OfflineBar from './OfflineBar'
 
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -13,12 +14,14 @@ const nav = [
   { to: '/customers', label: 'Customers', icon: Users },
   { to: '/schedule', label: 'Schedule', icon: CalendarDays },
   { to: '/invoices', label: 'Invoices', icon: Receipt },
+  { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/lists', label: 'Other lists', icon: ListFilter },
+  { to: '/cleanup', label: 'Clean up list', icon: Sparkles, adminOnly: true },
   { to: '/settings', label: 'Settings', icon: Cog },
 ]
 
 export default function Layout({ children }) {
-  const { user, signOut, isDemo } = useAuth()
+  const { user, signOut, isDemo, isAdmin } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
 
@@ -29,7 +32,7 @@ export default function Layout({ children }) {
         <span className="font-display font-extrabold text-[15px] text-slate-800 leading-tight">Elite Solar Care</span>
       </div>
       <nav className="flex-1 p-3 space-y-1">
-        {nav.map(({ to, label, icon: Icon, end }) => (
+        {nav.filter((n) => !n.adminOnly || isAdmin).map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end} onClick={() => setOpen(false)}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
@@ -73,6 +76,7 @@ export default function Layout({ children }) {
           <img src={logo} alt="" className="w-6 h-6 rounded-full" />
           <span className="font-display font-bold text-slate-800">{APP_NAME}</span>
         </header>
+        <OfflineBar />
         <main className="flex-1 overflow-auto p-4 md:p-8">{children}</main>
       </div>
     </div>
