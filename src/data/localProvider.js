@@ -36,8 +36,10 @@ export const localProvider = {
       .filter((c) => (segment ? segmentOf(c) === segment : true))
       .filter((c) => (status && status !== 'all' ? c.status === status : true))
       .filter((c) => (noPhone ? !usablePhone(c.phone) : true))
-      .filter((c) => !needle || [c.full_name, c.phone, c.email, c.city, c.street_address]
-        .filter(Boolean).join(' ').toLowerCase().includes(needle))
+      .filter((c) => !needle || [
+        c.full_name, c.phone, c.email, c.city, c.street_address,
+        c.billing_name, c.billing_city, c.billing_street_address,
+      ].filter(Boolean).join(' ').toLowerCase().includes(needle))
       .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
     const from = page * pageSize
     return { rows: all.slice(from, from + pageSize), total: all.length }

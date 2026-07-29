@@ -89,6 +89,14 @@ alter table customers add column if not exists call_attempts int not null defaul
 alter table customers add column if not exists hubspot_id text;
 alter table customers add column if not exists source text;
 create index if not exists idx_customers_hubspot on customers(hubspot_id);
+-- Billing details, kept separate from the service address: the panels are at one
+-- address, the bill can go elsewhere (a property manager, an HOA, a second home).
+alter table customers add column if not exists billing_different boolean not null default false;
+alter table customers add column if not exists billing_name text;
+alter table customers add column if not exists billing_street_address text;
+alter table customers add column if not exists billing_city text;
+alter table customers add column if not exists billing_state text;
+alter table customers add column if not exists billing_zip text;
 
 -- ---------- calls (one row per call attempt = full history) ----------
 create table if not exists calls (

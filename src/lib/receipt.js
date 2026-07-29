@@ -12,9 +12,36 @@ const esc = (s) =>
 export const receiptNumber = (inv) =>
   inv?.receipt_no ? `ESC-${inv.receipt_no}` : 'ESC-DRAFT'
 
+// "123 Sunray Dr, Sacramento, CA 95842" — US convention: the zip follows the
+// state with a space, not another comma.
+function formatAddress({ street, city, state, zip }) {
+  const cityLine = [[city, state].filter(Boolean).join(', '), zip].filter(Boolean).join(' ')
+  return [street, cityLine].filter(Boolean).join(', ')
+}
+
 function serviceAddress(c) {
-  return [c?.street_address, [c?.city, c?.state].filter(Boolean).join(', '), c?.zip]
-    .filter(Boolean).join(', ')
+  return formatAddress({ street: c?.street_address, city: c?.city, state: c?.state, zip: c?.zip })
+}
+
+// Who the bill goes to. Falls back to the customer's own name and address for
+// anything left blank, so a half-filled billing section can't produce a receipt
+// addressed to nobody.
+function billTo(c) {
+  const useBilling = !!c?.billing_different
+  const addr = useBilling
+    ? formatAddress({
+        street: c?.billing_street_address, city: c?.billing_city,
+        state: c?.billing_state, zip: c?.billing_zip,
+      })
+    : ''
+  const service = serviceAddress(c)
+  return {
+    name: (useBilling && c?.billing_name?.trim()) || c?.full_name || '—',
+    address: addr || service || '—',
+    service,
+    // Only worth printing the service address separately when it really differs.
+    showService: !!(service && addr && addr !== service),
+  }
 }
 
 // "January 2027 (every 6 months)"
@@ -37,6 +64,7 @@ export function receiptHTML({ invoice, customer }) {
   const paid = invoice.status === 'paid'
   const method = PAYMENT_METHODS.find((m) => m.key === invoice.payment_method)
   const nextClean = nextCleaningLine(customer, invoice)
+  const bill = billTo(customer)
   const dateStr = fmtDate(invoice.paid_date || invoice.created_at)
 
   const methodRows = PAYMENT_METHODS.map((m) => {
@@ -47,7 +75,7 @@ export function receiptHTML({ invoice, customer }) {
 
   return `<!doctype html>
 <html><head><meta charset="utf-8" />
-<title>Receipt ${esc(receiptNumber(invoice))} — ${esc(customer?.full_name || '')}</title>
+<title>Receipt ${esc(receiptNumber(invoice))} — ${esc(bill.name)}</title>
 <style>
   @page { size: letter; margin: 0.6in; }
   * { box-sizing: border-box; }
@@ -64,6 +92,7 @@ export function receiptHTML({ invoice, customer }) {
   h2 { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #004AAD;
        margin: 22px 0 6px; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; }
+  .grid2 .span2 { grid-column: 1 / -1; }
   .k { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: #888; }
   .v { font-weight: 600; }
   table { width: 100%; border-collapse: collapse; margin-top: 4px; }
@@ -116,10 +145,13 @@ export function receiptHTML({ invoice, customer }) {
 
     <h2>Billed to</h2>
     <div class="grid2">
-      <div><div class="k">Customer name</div><div class="v">${esc(customer?.full_name || '—')}</div></div>
+      <div><div class="k">${bill.showService || bill.name !== customer?.full_name ? 'Bill to' : 'Customer name'}</div><div class="v">${esc(bill.name)}</div></div>
       <div><div class="k">Phone</div><div class="v">${esc(customer?.phone || '—')}</div></div>
-      <div><div class="k">Service address</div><div class="v">${esc(serviceAddress(customer) || '—')}</div></div>
+      <div><div class="k">${bill.showService ? 'Billing address' : 'Service address'}</div><div class="v">${esc(bill.address)}</div></div>
       <div><div class="k">Email</div><div class="v">${esc(customer?.email || '—')}</div></div>
+      ${bill.showService
+        ? `<div class="span2"><div class="k">Service address (where the work was done)</div><div class="v">${esc(bill.service)}</div></div>`
+        : ''}
     </div>
 
     <h2>Services provided</h2>

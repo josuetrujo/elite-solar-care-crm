@@ -61,7 +61,8 @@ export const supabaseProvider = {
     const needle = sanitize(q)
     if (needle) {
       sel = sel.or(
-        ['full_name', 'phone', 'email', 'city', 'street_address']
+        ['full_name', 'phone', 'email', 'city', 'street_address',
+         'billing_name', 'billing_city', 'billing_street_address']
           .map((c) => `${c}.ilike.%${needle}%`).join(','),
       )
     }

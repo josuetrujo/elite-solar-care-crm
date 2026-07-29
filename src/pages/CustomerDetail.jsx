@@ -63,6 +63,8 @@ export default function CustomerDetail() {
       'property_type', 'panel_count', 'stories', 'roof_type', 'lead_source', 'status',
       'quoted_amount', 'recurring_frequency', 'next_service_due',
       'consent_sms', 'consent_email', 'do_not_call', 'bad_number', 'notes',
+      'billing_different', 'billing_name', 'billing_street_address',
+      'billing_city', 'billing_state', 'billing_zip',
     ]
     const patch = {}
     for (const k of EDITABLE) if (k in c) patch[k] = c[k]
@@ -266,6 +268,44 @@ export default function CustomerDetail() {
             {FIELD('City', <input className="input" value={c.city || ''} onChange={(e) => set('city', e.target.value)} />)}
             {FIELD('State', <input className="input" value={c.state || ''} onChange={(e) => set('state', e.target.value)} />)}
             {FIELD('Zip', <input className="input" value={c.zip || ''} onChange={(e) => set('zip', e.target.value)} />)}
+          </div>
+          <p className="text-xs text-slate-400 -mt-1">This is where the panels are.</p>
+
+          {/* Billing — hidden until it's actually different, so the form stays short */}
+          <div className="pt-3 border-t border-slate-100 space-y-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={!!c.billing_different}
+                onChange={(e) => set('billing_different', e.target.checked)}
+              />
+              Bill somewhere else (different address or company)
+            </label>
+
+            {c.billing_different ? (
+              <>
+                {FIELD('Bill to (company or person)', (
+                  <input className="input" placeholder={c.full_name || 'Leave blank to use the customer name'}
+                    value={c.billing_name || ''} onChange={(e) => set('billing_name', e.target.value)} />
+                ))}
+                {FIELD('Billing street address', (
+                  <input className="input" placeholder="Leave blank to use the service address"
+                    value={c.billing_street_address || ''} onChange={(e) => set('billing_street_address', e.target.value)} />
+                ))}
+                <div className="grid grid-cols-3 gap-3">
+                  {FIELD('City', <input className="input" value={c.billing_city || ''} onChange={(e) => set('billing_city', e.target.value)} />)}
+                  {FIELD('State', <input className="input" value={c.billing_state || ''} onChange={(e) => set('billing_state', e.target.value)} />)}
+                  {FIELD('Zip', <input className="input" value={c.billing_zip || ''} onChange={(e) => set('billing_zip', e.target.value)} />)}
+                </div>
+                <p className="text-xs text-slate-400">
+                  Receipts will say "Billed to" with these details, and still print the service address
+                  underneath so your crew knows where to go. Anything you leave blank falls back to the
+                  customer's own name and address.
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-slate-400">Receipts go to the customer at the address above.</p>
+            )}
           </div>
         </div>
 
