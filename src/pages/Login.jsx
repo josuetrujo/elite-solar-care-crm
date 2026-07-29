@@ -128,7 +128,9 @@ function friendly(message = '') {
   if (m.includes('email not confirmed')) return 'Check your email and click the confirmation link first.'
   if (m.includes('already registered')) return 'That email already has an account — sign in instead.'
   if (m.includes('password should be at least')) return 'Pick a longer password (at least 8 characters).'
-  if (m.includes('rate limit') || m.includes('too many')) return 'Too many tries in a row. Wait a minute and try again.'
+  if (m.includes('rate limit') || m.includes('too many')) {
+    return 'Email limit reached. Supabase’s free mail service allows only 2 account emails per hour. Stop retrying, wait up to 1 hour, then request one new link.'
+  }
   if (m.includes('failed to fetch') || m.includes('network')) return 'Can\'t reach the server. Check your internet connection.'
   return message || 'Something went wrong.'
 }

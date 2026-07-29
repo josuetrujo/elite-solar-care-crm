@@ -59,6 +59,12 @@ Tap **Forgot your password?** on the sign-in screen. You'll get an email with a
 link; the link opens the CRM and asks you to pick a new password. That's it —
 you're no longer dependent on me or on the Supabase dashboard to get back in.
 
+> **Free-plan email limit:** Supabase's built-in mail service sends at most two
+> authentication emails per hour for the entire project. If the CRM says the
+> email limit was reached, stop retrying, wait a full hour, and request exactly
+> one new link. Repeated clicks do not shorten the wait. A custom SMTP provider
+> is the long-term production fix for this low limit.
+
 > **One-time setup so those emails work.** In Supabase → **Authentication** →
 > **URL Configuration**, add your CRM's address to **Redirect URLs**:
 > ```
