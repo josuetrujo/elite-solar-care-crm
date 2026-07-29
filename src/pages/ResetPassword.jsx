@@ -23,7 +23,7 @@ export default function ResetPassword() {
       await updatePassword(password)
       setDone(true)
     } catch (e) {
-      setErr(e.message === 'Auth session missing!'
+      setErr(e.message === 'Auth session missing!' || e.message === 'Recovery session missing'
         ? 'This reset link has expired. Go back and request a new one.'
         : e.message)
     } finally { setBusy(false) }

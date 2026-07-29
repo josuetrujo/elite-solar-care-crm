@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "import:customers": "node scripts/import-customers.mjs",
-    "test": "node test-outbox.mjs"
+    "test": "node test-outbox.mjs && node test-auth-redirect.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

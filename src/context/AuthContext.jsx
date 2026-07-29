@@ -1,6 +1,11 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { USE_SUPABASE } from '../lib/config'
 import { supabase } from '../lib/supabase'
+import {
+  clearPasswordResetLocation,
+  isPasswordResetLocation,
+  passwordResetRedirect,
+} from '../lib/authUrls'
 
 const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
@@ -15,8 +20,7 @@ const DEMO_USER = {
 // email. Works on localhost and on GitHub Pages because it's built from the
 // page's own address rather than hard-coded.
 export function resetRedirectUrl() {
-  const { origin, pathname } = window.location
-  return `${origin}${pathname}#/reset`
+  return passwordResetRedirect()
 }
 
 export function AuthProvider({ children }) {
@@ -24,8 +28,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(USE_SUPABASE)
   // True while the user is inside the "click the email link, set a new
   // password" flow — the app must show the reset screen, not the dashboard.
-  const [recovering, setRecovering] = useState(
-    () => typeof window !== 'undefined' && window.location.hash.startsWith('#/reset')
+  const [recovering, setRecovering] = useState(() =>
+    typeof window !== 'undefined' && isPasswordResetLocation()
   )
 
   const loadProfile = useCallback(async (session) => {
@@ -81,7 +85,7 @@ export function AuthProvider({ children }) {
     refresh,
     endRecovery: () => {
       setRecovering(false)
-      if (window.location.hash.startsWith('#/reset')) window.location.hash = '#/'
+      clearPasswordResetLocation()
     },
     async signIn(email, password) {
       if (!USE_SUPABASE) { setUser(DEMO_USER); return }
@@ -106,6 +110,11 @@ export function AuthProvider({ children }) {
     // Sets the new password once they're back from the email link.
     async updatePassword(password) {
       if (!USE_SUPABASE) throw new Error('Not available in demo mode.')
+      // getSession waits for Supabase to finish consuming the recovery tokens
+      // from the URL. This avoids racing updateUser on slower phones/browsers.
+      const { data, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+      if (!data.session) throw new Error('Recovery session missing')
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
     },

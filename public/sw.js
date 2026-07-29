@@ -11,7 +11,7 @@
  *   - Page loads try the network first, so a deploy is picked up immediately.
  */
 
-const VERSION = 'esc-v1'
+const VERSION = 'esc-v2'
 const SHELL = `${VERSION}-shell`
 const ASSETS = `${VERSION}-assets`
 
