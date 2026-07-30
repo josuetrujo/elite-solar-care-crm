@@ -6,11 +6,9 @@ import ResetPassword from './pages/ResetPassword'
 import PendingApproval from './pages/PendingApproval'
 import Dashboard from './pages/Dashboard'
 import CallMode from './pages/CallMode'
-import Leads from './pages/Leads'
 import Callbacks from './pages/Callbacks'
-import Customers from './pages/Customers'
+import Contacts from './pages/Contacts'
 import CustomerDetail from './pages/CustomerDetail'
-import OtherLists from './pages/OtherLists'
 import Schedule from './pages/Schedule'
 import Invoices from './pages/Invoices'
 import Reports from './pages/Reports'
@@ -43,11 +41,13 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/call" element={<CallMode />} />
-        <Route path="/leads" element={<Leads />} />
         <Route path="/callbacks" element={<Callbacks />} />
-        <Route path="/customers" element={<Customers />} />
+        <Route path="/contacts" element={<Contacts />} />
         <Route path="/customers/:id" element={<CustomerDetail />} />
-        <Route path="/lists" element={<OtherLists />} />
+        {/* The old separate lists are now filters on the one contact list. */}
+        <Route path="/leads" element={<Navigate to="/contacts?class=lead" replace />} />
+        <Route path="/customers" element={<Navigate to="/contacts?class=customer" replace />} />
+        <Route path="/lists" element={<Navigate to="/contacts?class=dnc" replace />} />
         <Route path="/schedule" element={<Schedule />} />
         <Route path="/invoices" element={<Invoices />} />
         <Route path="/reports" element={<Reports />} />

@@ -136,10 +136,11 @@ supabase secrets set TWILIO_ACCOUNT_SID=... TWILIO_AUTH_TOKEN=... TWILIO_PHONE_N
 supabase secrets set RESEND_API_KEY=... REMINDER_FROM_EMAIL="Elite Solar Care <admin@elitesolarcare.com>"
 ```
 
-### Step 3 — Publish the reminder function
+### Step 3 — Publish the reminder and invoice functions
 
 ```
 supabase functions deploy send-reminder
+supabase functions deploy send-invoice
 ```
 
 ### Step 4 — Switch it on
@@ -156,6 +157,40 @@ VITE_EMAIL_ENABLED=true
 Now every customer page has **Text reminder** and **Email reminder** buttons. They stay
 greyed out until that customer has ticked the matching consent box and has a phone number
 or email on file.
+
+---
+
+## Emailing an invoice or receipt
+
+Every invoice has an **Email** button (on the customer's page and on the Invoices screen),
+and the New-invoice form has **Create & email**. It works two ways, and you don't have to
+choose — the CRM picks whichever is available:
+
+| | What happens |
+|---|---|
+| **Before Resend is set up** | Your own email app opens (Mail, Gmail, Outlook) with the customer's address, the subject and a plain-text copy of the receipt already filled in. You press Send. Works today, nothing to configure. |
+| **After Resend is set up** (`VITE_EMAIL_ENABLED=true` + `supabase functions deploy send-invoice`) | The CRM emails the branded receipt itself, records the send against the customer, and an **unpaid** invoice becomes **sent**. |
+
+The `send-invoice` function decides who the receipt goes to by re-reading the invoice and
+customer in the database, so a browser can never redirect a receipt somewhere else, and it
+only runs for a signed-in, approved admin or member.
+
+**Consent:** a receipt for work already done is a *transactional* email, so it does not
+need the marketing email opt-in. The `consent_email` box gates reminders and follow-ups,
+which is where it legally belongs.
+
+---
+
+## Saving an invoice as a PDF
+
+Press **PDF** on any invoice (or **Create & download PDF** on a new one). The receipt is
+rendered off-screen and your browser's print box opens — choose **Save as PDF** as the
+destination. On a phone, use the Share button and **Save to Files**. The suggested filename
+is the receipt number and the customer's name, e.g. `Receipt ESC-1003 — Sofia Reyes.pdf`.
+
+There is no separate PDF library to install, and because it's the same sheet either way,
+a printed copy and a saved copy always match. **Receipt** opens the same page in a tab if
+you'd rather look at it before saving.
 
 ---
 

@@ -35,27 +35,37 @@ export const RECURRING_OPTIONS = [
 ]
 
 // Call outcome buttons. Each describes what pressing it does to the contact.
+// `answered` says whether we actually spoke to a person — the history table
+// shows that as its own column ("Answered" / "No answer").
 export const DISPOSITIONS = [
-  { key: 'no_answer', label: 'No Answer', tone: 'bg-slate-100 text-slate-700 hover:bg-slate-200' },
-  { key: 'voicemail', label: 'Voicemail', tone: 'bg-slate-100 text-slate-700 hover:bg-slate-200' },
-  { key: 'busy', label: 'Busy', tone: 'bg-slate-100 text-slate-700 hover:bg-slate-200' },
-  { key: 'call_later', label: 'Call Later', needsCallback: true, tone: 'bg-amber-100 text-amber-800 hover:bg-amber-200' },
-  { key: 'not_interested', label: 'Not Interested', setsStatus: 'not_interested', tone: 'bg-orange-100 text-orange-800 hover:bg-orange-200' },
-  { key: 'bad_number', label: 'Wrong Number', setsBadNumber: true, tone: 'bg-orange-100 text-orange-800 hover:bg-orange-200' },
-  { key: 'dnc', label: 'DNC', setsDnc: true, tone: 'bg-rose-100 text-rose-700 hover:bg-rose-200' },
-  { key: 'sale', label: 'SALE', opensSale: true, setsStatus: 'customer', tone: 'bg-emerald-600 text-white hover:bg-emerald-700' },
+  { key: 'no_answer', label: 'No Answer', answered: false, tone: 'bg-slate-100 text-slate-700 hover:bg-slate-200' },
+  { key: 'voicemail', label: 'Voicemail', answered: false, tone: 'bg-slate-100 text-slate-700 hover:bg-slate-200' },
+  { key: 'busy', label: 'Busy', answered: false, tone: 'bg-slate-100 text-slate-700 hover:bg-slate-200' },
+  { key: 'call_later', label: 'Call Later', answered: true, needsCallback: true, tone: 'bg-amber-100 text-amber-800 hover:bg-amber-200' },
+  { key: 'not_interested', label: 'Not Interested', answered: true, setsStatus: 'not_interested', tone: 'bg-orange-100 text-orange-800 hover:bg-orange-200' },
+  { key: 'bad_number', label: 'Wrong Number', answered: null, setsBadNumber: true, tone: 'bg-orange-100 text-orange-800 hover:bg-orange-200' },
+  { key: 'dnc', label: 'DNC', answered: true, setsDnc: true, tone: 'bg-rose-100 text-rose-700 hover:bg-rose-200' },
+  { key: 'sale', label: 'SALE', answered: true, opensSale: true, setsStatus: 'customer', tone: 'bg-emerald-600 text-white hover:bg-emerald-700' },
 ]
 
 export const dispositionLabel = (k) => DISPOSITIONS.find((d) => d.key === k)?.label || k
-
-// Contact lists (segments). Derived from customer fields — see lib/segments.js
-export const SEGMENTS = {
-  lead: { label: 'Leads', color: 'bg-slate-100 text-slate-700' },
-  customer: { label: 'Customers', color: 'bg-emerald-100 text-emerald-800' },
-  lost: { label: 'Lost', color: 'bg-orange-100 text-orange-800' },
-  bad_number: { label: 'Bad Number', color: 'bg-amber-100 text-amber-800' },
-  dnc: { label: 'Do Not Call', color: 'bg-rose-100 text-rose-700' },
+export const dispositionAnswered = (k) => {
+  const d = DISPOSITIONS.find((x) => x.key === k)
+  return d ? d.answered : null
 }
+
+// Contact classifications. Everyone lives in ONE contact list; this is the
+// label that says what they are. Derived from customer fields — see lib/segments.js
+export const SEGMENTS = {
+  customer: { label: 'Customer', color: 'bg-emerald-100 text-emerald-800' },
+  lead: { label: 'Lead', color: 'bg-slate-100 text-slate-700' },
+  dnc: { label: 'Do Not Call', color: 'bg-rose-100 text-rose-700' },
+  lost: { label: 'Not Interested', color: 'bg-orange-100 text-orange-800' },
+  bad_number: { label: 'Bad Number', color: 'bg-amber-100 text-amber-800' },
+}
+
+// Order the filter chips appear in, above the one contact list.
+export const SEGMENT_ORDER = ['customer', 'lead', 'dnc', 'lost', 'bad_number']
 
 export const APP_NAME = 'Elite Solar Care CRM'
 

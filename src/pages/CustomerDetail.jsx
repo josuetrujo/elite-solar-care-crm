@@ -1,16 +1,17 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Save, Trash2, Calculator, Bell, CalendarPlus, CheckCircle2, X, Printer, Receipt } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, Calculator, Bell, CalendarPlus, CheckCircle2, X, Receipt, Printer, Download, Mail } from 'lucide-react'
 import { db } from '../data'
 import { PIPELINE, RECURRING_OPTIONS, PAYMENT_METHODS, INVOICE_STATUSES } from '../lib/config'
 import { estimateQuote } from '../lib/pricing'
 import { nextDueFrom, fmtDate, fmtMoney, toISODate } from '../lib/dates'
-import { openReceipt, receiptNumber } from '../lib/receipt'
+import { openReceipt, downloadReceiptPdf, receiptNumber } from '../lib/receipt'
+import { emailInvoice, invoiceEmailMode } from '../lib/invoiceEmail'
 import { remindersEnabled, smsEnabled, emailEnabled, sendReminder } from '../lib/notifications'
-import { segmentOf } from '../lib/segments'
-import { SEGMENTS } from '../lib/config'
+import { segmentOf, classificationPatch } from '../lib/segments'
+import { SEGMENTS, SEGMENT_ORDER } from '../lib/config'
 import DispositionBar from '../components/DispositionBar'
-import CallHistory from '../components/CallHistory'
+import ActivityHistory from '../components/ActivityHistory'
 import JobPhotos from '../components/JobPhotos'
 import { useAuth } from '../context/AuthContext'
 
@@ -18,12 +19,8 @@ const FIELD = (label, node) => (
   <div><label className="label">{label}</label>{node}</div>
 )
 
-// Which list a segment lives in, for "moved to…" links.
-function segRoute(seg) {
-  if (seg === 'customer') return '/customers'
-  if (seg === 'lead') return '/leads'
-  return '/lists' // dnc, lost, bad_number
-}
+// Everyone lives in the one contact list; the link just pre-filters it.
+const segRoute = (seg) => `/contacts?class=${seg}`
 
 export default function CustomerDetail() {
   const { id } = useParams()
@@ -80,10 +77,27 @@ export default function CustomerDetail() {
       setToast({ msg: 'Saved.' })
     }
   }
+  // The classification buttons at the top: one press writes whichever fields
+  // put the contact in that list (DNC flag, bad number, pipeline status).
+  async function setClassification(next) {
+    const patch = classificationPatch(next, c)
+    setC({ ...c, ...patch })
+    await db.updateCustomer(id, patch)
+    origSeg.current = next
+    setSaved(true)
+    setToast({ msg: `Moved to ${SEGMENTS[next].label}.`, to: segRoute(next), label: 'View that list' })
+  }
+
+  async function cancelJob(j) {
+    await db.updateJob(j.id, { status: 'canceled' })
+    reload()
+    setToast({ msg: 'Visit canceled.' })
+  }
+
   async function remove() {
     if (!confirm('Delete this customer? This cannot be undone.')) return
     await db.deleteCustomer(id)
-    navigate('/customers')
+    navigate('/contacts')
   }
 
   const quote = estimateQuote({
@@ -166,7 +180,8 @@ export default function CustomerDetail() {
     })
   }
 
-  async function saveInvoice() {
+  // `after` is what to do once it exists: nothing, download the PDF, or email it.
+  async function saveInvoice(after = 'none') {
     const d = invDraft
     const amount = Number(d.amount)
     if (!amount || amount <= 0) { setToast({ msg: 'Enter an amount greater than $0 first.' }); return }
@@ -186,7 +201,20 @@ export default function CustomerDetail() {
       const saved = await db.createInvoice(row)
       setInvoices([saved, ...invoices])
       setInvDraft(null)
-      setToast({ msg: `${receiptNumber(saved)} created. Press Receipt to save or print it.`, to: '/invoices', label: 'All invoices' })
+
+      if (after === 'pdf') {
+        downloadReceiptPdf({ invoice: saved, customer: c })
+        setToast({ msg: `${receiptNumber(saved)} created. In the print box that opens, choose "Save as PDF".` })
+        return
+      }
+      if (after === 'email') {
+        await emailReceipt(saved)
+        return
+      }
+      setToast({
+        msg: `${receiptNumber(saved)} created — it's in the list below, with PDF, Receipt and Email buttons.`,
+        to: '/invoices', label: 'All invoices',
+      })
     } catch (e) {
       setToast({ msg: `Could not create the invoice: ${e.message}` })
     }
@@ -205,6 +233,27 @@ export default function CustomerDetail() {
     if (!ok) setToast({ msg: 'Your browser blocked the receipt window. Allow pop-ups for this site, then try again.' })
   }
 
+  function pdfReceipt(inv) {
+    downloadReceiptPdf({ invoice: inv, customer: c })
+    setToast({ msg: 'Choose "Save as PDF" as the destination in the print box that just opened.' })
+  }
+
+  // Email the receipt: straight from the CRM when Resend keys are set,
+  // otherwise it opens the owner's own email app pre-filled.
+  async function emailReceipt(inv) {
+    try {
+      const res = await emailInvoice({ invoice: inv, customer: c })
+      if (res.mode === 'crm') {
+        reload() // an unpaid invoice becomes "sent" once it's emailed
+        setToast({ msg: `${receiptNumber(inv)} emailed to ${res.to}.` })
+      } else {
+        setToast({ msg: `Your email app is opening with ${receiptNumber(inv)} ready for ${res.to}. Press Send there.` })
+      }
+    } catch (e) {
+      setToast({ msg: `Not sent — ${e.message}` })
+    }
+  }
+
   async function notify(channel) {
     try {
       const res = await sendReminder({ customer: c, kind: 'service_due', channel })
@@ -217,7 +266,7 @@ export default function CustomerDetail() {
   return (
     <div className="space-y-5 max-w-4xl">
       <div className="flex items-center justify-between">
-        <Link to="/customers" className="btn-ghost"><ArrowLeft size={16} /> Back</Link>
+        <Link to="/contacts" className="btn-ghost"><ArrowLeft size={16} /> Back to contacts</Link>
         {canEdit && (
           <div className="flex gap-2">
             {isAdmin && <button className="btn-danger" onClick={remove}><Trash2 size={16} /> Delete</button>}
@@ -241,6 +290,25 @@ export default function CustomerDetail() {
         <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${seg.color}`}>{seg.label}</span>
         {c.phone && <a href={`tel:${c.phone}`} className="text-sm text-brand-600 hover:underline">📞 {c.phone}</a>}
       </div>
+
+      {/* Classification — the one label that decides which list they show up in. */}
+      {canEdit && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs uppercase tracking-wide text-slate-400">Type</span>
+          {SEGMENT_ORDER.map((key) => {
+            const active = segmentOf(c) === key
+            return (
+              <button key={key} onClick={() => setClassification(key)} disabled={active}
+                className={`rounded-lg px-3 py-1 text-xs font-semibold border ${
+                  active ? 'bg-brand-600 border-brand-600 text-white cursor-default'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}>
+                {SEGMENTS[key].label}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Calling: log this call */}
       {canEdit && (
@@ -413,31 +481,14 @@ export default function CustomerDetail() {
         </div>
       </div>
 
-      {/* Call history */}
-      <div className="card p-5">
-        <h2 className="font-semibold mb-3">Call history</h2>
-        <CallHistory calls={calls} />
-      </div>
-
-      {/* Service history */}
-      <div className="card p-5">
-        <h2 className="font-semibold mb-3">Service history</h2>
-        {jobs.length === 0 ? <p className="text-sm text-slate-400">No jobs logged yet.</p> : (
-          <ul className="divide-y divide-slate-100 text-sm">
-            {jobs.map((j) => (
-              <li key={j.id} className="py-2 flex items-center justify-between gap-2">
-                <span>{fmtDate(j.completed_date || j.scheduled_date)} · {j.work_done || 'Service'}</span>
-                <span className="flex items-center gap-3 text-slate-600 shrink-0">
-                  <span>{fmtMoney(j.amount)} · {j.status}</span>
-                  {canEdit && j.status === 'scheduled' && (
-                    <button className="text-xs font-semibold text-emerald-700 hover:underline" onClick={() => markDone(j)}>Mark done</button>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {/* Calls and cleanings, in one sortable table */}
+      <ActivityHistory
+        calls={calls}
+        jobs={jobs}
+        canEdit={canEdit}
+        onMarkDone={markDone}
+        onCancelJob={cancelJob}
+      />
 
       {/* Photos */}
       <JobPhotos customerId={id} jobs={jobs} />
@@ -487,10 +538,25 @@ export default function CustomerDetail() {
                 onChange={(e) => setInvDraft({ ...invDraft, markPaid: e.target.checked })} />
               Already paid (prints as "Paid in full")
             </label>
-            <div className="flex gap-2">
-              <button className="btn-primary" onClick={saveInvoice}>Create invoice</button>
+            <div className="flex gap-2 flex-wrap">
+              <button className="btn-primary" onClick={() => saveInvoice('none')}>Create invoice</button>
+              <button className="btn-ghost" onClick={() => saveInvoice('pdf')}>
+                <Download size={16} /> Create &amp; download PDF
+              </button>
+              <button className="btn-ghost" disabled={!c.email}
+                title={c.email ? '' : 'Add an email address for this customer first'}
+                onClick={() => saveInvoice('email')}>
+                <Mail size={16} /> Create &amp; email
+              </button>
               <button className="btn-ghost" onClick={() => setInvDraft(null)}>Cancel</button>
             </div>
+            <p className="text-xs text-slate-500">
+              PDF opens the print box — pick <strong>Save as PDF</strong> as the destination
+              (on a phone: Share → Save to Files).
+              {' '}{invoiceEmailMode() === 'crm'
+                ? 'Email sends the receipt straight from the CRM.'
+                : 'Email opens your own email app with the receipt filled in, ready to send.'}
+            </p>
           </div>
         )}
 
@@ -512,9 +578,26 @@ export default function CustomerDetail() {
                   </span>
                   <span className="flex items-center gap-2 shrink-0">
                     <span className="font-bold">{fmtMoney(inv.amount)}</span>
+                    <button className="btn-ghost !h-8 !px-3" onClick={() => pdfReceipt(inv)}>
+                      <Download size={14} /> PDF
+                    </button>
                     <button className="btn-ghost !h-8 !px-3" onClick={() => printReceipt(inv)}>
                       <Printer size={14} /> Receipt
                     </button>
+                    {canEdit && (
+                      <button
+                        className="btn-ghost !h-8 !px-3"
+                        disabled={!c.email}
+                        title={c.email
+                          ? (invoiceEmailMode() === 'crm'
+                            ? `Email it to ${c.email}`
+                            : `Opens your email app addressed to ${c.email}`)
+                          : 'This customer has no email address on file'}
+                        onClick={() => emailReceipt(inv)}
+                      >
+                        <Mail size={14} /> Email
+                      </button>
+                    )}
                     {canEdit && inv.status !== 'paid' && (
                       <button className="btn-ghost !h-8 !px-3 text-emerald-700" onClick={() => markInvoicePaid(inv)}>
                         <CheckCircle2 size={14} /> Paid

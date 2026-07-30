@@ -33,7 +33,7 @@ export const localProvider = {
   async queryCustomers({ segment, q, status, page = 0, pageSize = 50, noPhone = false } = {}) {
     const needle = (q || '').trim().toLowerCase()
     const all = load(CKEY, sampleCustomers)
-      .filter((c) => (segment ? segmentOf(c) === segment : true))
+      .filter((c) => (segment && segment !== 'all' ? segmentOf(c) === segment : true))
       .filter((c) => (status && status !== 'all' ? c.status === status : true))
       .filter((c) => (noPhone ? !usablePhone(c.phone) : true))
       .filter((c) => !needle || [
@@ -47,7 +47,7 @@ export const localProvider = {
 
   async countCustomersBySegment() {
     const all = load(CKEY, sampleCustomers)
-    const out = { lead: 0, customer: 0, lost: 0, bad_number: 0, dnc: 0 }
+    const out = { lead: 0, customer: 0, lost: 0, bad_number: 0, dnc: 0, all: all.length }
     for (const c of all) out[segmentOf(c)] = (out[segmentOf(c)] || 0) + 1
     return out
   },

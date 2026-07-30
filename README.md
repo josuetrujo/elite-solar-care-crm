@@ -27,17 +27,24 @@ To stop the app: press **Ctrl + C** in the terminal.
 ## 2. What's already built
 
 - **Customers** — searchable list, filter by pipeline stage, full detail page.
-- **Calling** — Call Mode (one lead at a time, tap-to-call, big outcome buttons) plus a
-  call history per contact. Outcomes move contacts between Leads / Customers / Callbacks /
-  Lost / Bad Number / Do Not Call automatically.
+- **Contacts** — ONE list of everybody, labelled Customer / Lead / Do Not Call /
+  Not Interested / Bad Number, with chips and counts to filter it.
+- **Calling** — Call Mode (one lead at a time, tap-to-call, big outcome buttons). Outcomes
+  re-label contacts automatically (Customer / Callbacks / Not Interested / Bad Number / DNC).
+- **History per contact** — one sortable table of every call and cleaning: click any column
+  to sort like a spreadsheet, whether they answered, what was quoted or charged, and note
+  previews that open in full. A booked cleaning shows as **Upcoming** until its date passes,
+  then **Past due** until you say what happened.
 - **Pipeline** — New Lead → Quoted → Scheduled → Completed → Recurring.
 - **System details** — panel count, stories, roof type, property type.
 - **Quote calculator** — uses your real price list ($8/panel, $50/story, $0.54/mi, +$100 non-shingle, +$100 first-time).
 - **Appointment calendar** — pick a date and **Book it** on a customer's page; the job appears
   on the Schedule screen under Past due / Today / Next 7 days / Later, plus a month grid.
   **Done** completes the job and auto-sets the next recurring cleaning.
-- **Invoices & receipts** — branded receipts numbered on from ESC-1003, printable or saveable
-  as PDF with no extra software. Completing a booked cleaning raises the invoice for you.
+- **Invoices & receipts** — branded receipts numbered on from ESC-1003. **PDF** saves one
+  through your browser's print box (no extra software), **Email** sends it to the customer —
+  through your own email app today, or straight from the CRM once Resend keys are added.
+  Completing a booked cleaning raises the invoice for you.
 - **Consent tracking** — SMS/email opt-in checkboxes (required by law before messaging).
 - **Settings** — shows which connections are on/off and your role.
 - **Accounts & crew** — sign in, forgot-password by email, and an approval gate:

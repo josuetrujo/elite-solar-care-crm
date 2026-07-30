@@ -1,16 +1,13 @@
 // Real cloud provider, used when Supabase keys are present.
 import { supabase } from '../lib/supabase'
+// The status groups come from lib/segments.js so the database filter and the
+// browser-side segmentOf() can never drift apart.
+import { CUSTOMER_STATUSES, LOST_STATUSES, LEAD_STATUSES } from '../lib/segments'
 
 const unwrap = ({ data, error }) => {
   if (error) throw error
   return data
 }
-
-// Statuses that put a contact in each list. Must stay in step with
-// segmentOf() in lib/segments.js — that's the browser-side version of this.
-const CUSTOMER_STATUSES = ['customer', 'scheduled', 'completed', 'recurring']
-const LOST_STATUSES = ['not_interested', 'lost']
-const LEAD_STATUSES = ['new_lead', 'quoted']
 
 function applySegment(sel, segment) {
   switch (segment) {
@@ -84,6 +81,9 @@ export const supabaseProvider = {
       if (error) throw error
       out[seg] = count ?? 0
     }
+    const { count, error } = await supabase.from('customers').select('id', { count: 'exact', head: true })
+    if (error) throw error
+    out.all = count ?? 0
     return out
   },
 

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, PhoneCall, Phone, Users, CalendarClock, CalendarDays, Receipt, Settings as Cog, ListFilter, LogOut, Menu, BarChart3, Sparkles } from 'lucide-react'
+import { LayoutDashboard, Phone, Users, CalendarClock, CalendarDays, Receipt, Settings as Cog, LogOut, Menu, BarChart3, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { APP_NAME } from '../lib/config'
@@ -9,13 +9,11 @@ import OfflineBar from './OfflineBar'
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/call', label: 'Call Mode', icon: Phone },
-  { to: '/leads', label: 'Leads', icon: PhoneCall },
+  { to: '/contacts', label: 'Contacts', icon: Users },
   { to: '/callbacks', label: 'Callbacks', icon: CalendarClock },
-  { to: '/customers', label: 'Customers', icon: Users },
   { to: '/schedule', label: 'Schedule', icon: CalendarDays },
   { to: '/invoices', label: 'Invoices', icon: Receipt },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
-  { to: '/lists', label: 'Other lists', icon: ListFilter },
   { to: '/cleanup', label: 'Clean up list', icon: Sparkles, adminOnly: true },
   { to: '/settings', label: 'Settings', icon: Cog },
 ]

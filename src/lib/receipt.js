@@ -193,11 +193,100 @@ export function receiptHTML({ invoice, customer }) {
 </body></html>`
 }
 
+// ---- email versions of the same receipt ------------------------------------
+// The subject line a customer sees, and a plain-text copy for mail apps that
+// can't (or won't) show HTML.
+export const receiptSubject = (invoice) =>
+  `${invoice?.status === 'paid' ? 'Receipt' : 'Invoice'} ${receiptNumber(invoice)} — ${BUSINESS.name.replace(/ LLC$/i, '')}`
+
+export function receiptText({ invoice, customer }) {
+  const paid = invoice.status === 'paid'
+  const bill = billTo(customer)
+  const method = PAYMENT_METHODS.find((m) => m.key === invoice.payment_method)
+  const nextClean = nextCleaningLine(customer, invoice)
+  const firstName = String(customer?.first_name || bill.name || 'there').split(' ')[0]
+
+  return [
+    `Hi ${firstName},`,
+    '',
+    paid
+      ? `Thank you — here is your receipt from ${BUSINESS.name}.`
+      : `Here is your invoice from ${BUSINESS.name}.`,
+    '',
+    `${paid ? 'Receipt' : 'Invoice'} number: ${receiptNumber(invoice)}`,
+    `Date: ${fmtDate(invoice.paid_date || invoice.created_at)}`,
+    `Service: ${invoice.description || 'Solar Panel Cleaning'}`,
+    bill.service ? `Service address: ${bill.service}` : '',
+    `Total: ${fmtMoney(invoice.amount)}`,
+    paid
+      ? `Status: PAID IN FULL${method ? ` (${method.label.toLowerCase()})` : ''}`
+      : 'Status: BALANCE DUE',
+    invoice.notes ? `\n${invoice.notes}` : '',
+    nextClean ? `\nRecommended next cleaning: ${nextClean}` : '',
+    '',
+    `Questions? Call ${BUSINESS.phone} or reply to this email.`,
+    '',
+    BUSINESS.thanks,
+    BUSINESS.name,
+  ].filter((l) => l !== '').join('\n')
+}
+
 // Opens the receipt in a new tab. Returns false if the browser blocked the popup.
 export function openReceipt({ invoice, customer }) {
   const w = window.open('', '_blank')
   if (!w) return false
   w.document.write(receiptHTML({ invoice, customer }))
   w.document.close()
+  return true
+}
+
+// "Download PDF" — the same sheet, straight to the browser's print box, where
+// "Destination: Save as PDF" writes the file (on a phone: Share → Save to
+// Files). That is how a web page makes a PDF without shipping a PDF library,
+// and it's the identical sheet, so a printed copy and a saved copy always match.
+//
+// It renders into a hidden iframe rather than a new tab because pop-up blockers
+// silently swallow new tabs — the receipt has to come out every time. Chrome
+// names the saved file after the PAGE title, so the title is borrowed for the
+// length of the print and put straight back.
+let appTitle = null
+
+export function downloadReceiptPdf({ invoice, customer }) {
+  const frame = document.createElement('iframe')
+  frame.setAttribute('aria-hidden', 'true')
+  frame.setAttribute('title', 'Receipt')
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;'
+  document.body.appendChild(frame)
+
+  const doc = frame.contentWindow.document
+  doc.open()
+  doc.write(receiptHTML({ invoice, customer }))
+  doc.close()
+
+  // Remember the app's own title once. Reading it each time would capture a
+  // receipt title if two receipts are saved back to back, and the tab would
+  // keep that name for good.
+  if (appTitle === null) appTitle = document.title
+  let done = false
+  const cleanUp = () => {
+    if (done) return
+    done = true
+    document.title = appTitle
+    frame.remove()
+  }
+
+  const go = () => {
+    document.title = `Receipt ${receiptNumber(invoice)} — ${customer?.full_name || 'Elite Solar Care'}`
+    frame.contentWindow.focus()
+    frame.contentWindow.print()
+    // afterprint doesn't fire everywhere, so a timer is the backstop. Removing
+    // the iframe too early would cancel the print on some browsers.
+    frame.contentWindow.addEventListener('afterprint', () => setTimeout(cleanUp, 300))
+    setTimeout(cleanUp, 60000)
+  }
+
+  // Give the sheet a moment to lay out; printing a half-rendered page prints blank.
+  if (doc.readyState === 'complete') setTimeout(go, 150)
+  else frame.onload = () => setTimeout(go, 150)
   return true
 }

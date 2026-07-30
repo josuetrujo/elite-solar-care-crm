@@ -49,10 +49,10 @@ export default function Dashboard() {
       <h1 className="text-xl font-bold">Dashboard</h1>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        {stat(<PhoneCall size={20} />, 'Leads to call', leads.length, '/leads')}
+        {stat(<PhoneCall size={20} />, 'Leads to call', leads.length, '/contacts?class=lead')}
         {stat(<CalendarClock size={20} />, 'Callbacks due', callbacksDue.length, '/callbacks')}
-        {stat(<PhoneOutgoing size={20} />, 'Calls today', callsToday.length, '/leads')}
-        {stat(<Users size={20} />, 'Customers', customers.filter((c) => segmentOf(c) === 'customer').length, '/customers')}
+        {stat(<PhoneOutgoing size={20} />, 'Calls today', callsToday.length, '/contacts?class=lead')}
+        {stat(<Users size={20} />, 'Customers', customers.filter((c) => segmentOf(c) === 'customer').length, '/contacts?class=customer')}
         {stat(<AlertTriangle size={20} />, 'Service overdue', overdue.length, '/schedule')}
         {stat(<DollarSign size={20} />, 'Open pipeline', fmtMoney(pipelineValue))}
       </div>

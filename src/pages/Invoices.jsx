@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Receipt, Printer, CheckCircle2, Trash2, Send, X, Search } from 'lucide-react'
+import { Receipt, Printer, Download, Mail, CheckCircle2, Trash2, Send, X, Search } from 'lucide-react'
 import { db } from '../data'
 import { useAuth } from '../context/AuthContext'
 import { paymentsEnabled, createSquareInvoice } from '../lib/square'
-import { openReceipt, receiptNumber } from '../lib/receipt'
+import { openReceipt, downloadReceiptPdf, receiptNumber } from '../lib/receipt'
+import { emailInvoice, invoiceEmailMode } from '../lib/invoiceEmail'
 import { fmtDate, fmtMoney, toISODate } from '../lib/dates'
 import { INVOICE_STATUSES } from '../lib/config'
 
@@ -91,6 +92,26 @@ export default function Invoices() {
     if (!ok) setToast('Your browser blocked the receipt window. Allow pop-ups for this site, then try again.')
   }
 
+  function pdf(inv) {
+    const ok = downloadReceiptPdf({ invoice: inv, customer: inv.customer })
+    setToast(ok
+      ? 'Choose "Save as PDF" in the print box that just opened.'
+      : 'Your browser blocked the download window. Allow pop-ups for this site, then try again.')
+  }
+
+  async function email(inv) {
+    setBusy(inv.id)
+    try {
+      const res = await emailInvoice({ invoice: inv, customer: inv.customer })
+      if (res.mode === 'crm') {
+        await load() // an unpaid invoice becomes "sent" once it's emailed
+        setToast(`${receiptNumber(inv)} emailed to ${res.to}.`)
+      } else {
+        setToast(`Your email app is opening with ${receiptNumber(inv)} ready for ${res.to}. Press Send there.`)
+      }
+    } catch (e) { setToast(`Not sent — ${e.message}`) } finally { setBusy(null) }
+  }
+
   if (loading) return <p className="text-slate-400">Loading…</p>
   if (error) return <p className="text-rose-600">⚠️ {error}</p>
 
@@ -125,6 +146,16 @@ export default function Invoices() {
         </div>
       )}
 
+      {invoiceEmailMode() === 'mail_app' && (
+        <div className="card p-4 text-sm text-slate-600">
+          <strong className="text-slate-800">Email works today through your own email app.</strong> Press
+          {' '}<em>Email</em> on an invoice and your mail app opens with the customer's address, subject and
+          receipt already filled in — you press Send. To have the CRM send the branded receipt itself, add your
+          Resend key and set <code className="px-1 rounded bg-slate-100">VITE_EMAIL_ENABLED=true</code>
+          {' '}(see <em>PAYMENTS-AND-REMINDERS.md</em>).
+        </div>
+      )}
+
       <div className="card p-4 flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -153,12 +184,12 @@ export default function Invoices() {
           <div className="text-sm text-slate-500 space-y-2">
             <p className="font-medium text-slate-700">No invoices here yet.</p>
             <p>
-              Invoices are created from a customer's page: open a customer, scroll to
-              <strong> Service history</strong>, and press <strong>Mark done</strong> on a booked cleaning —
-              the CRM creates the receipt for you. There's also a <strong>New invoice</strong> button
-              on every customer's page.
+              Invoices are created from a customer's page: open a customer, find the booked cleaning
+              in <strong>History</strong>, and press <strong>Mark done</strong> — the CRM creates the receipt
+              for you. There's also a <strong>New invoice</strong> button on every customer's page, which can
+              download the PDF or email it as soon as it's created.
             </p>
-            <Link to="/customers" className="btn-ghost !h-9 inline-flex">Go to Customers</Link>
+            <Link to="/contacts?class=customer" className="btn-ghost !h-9 inline-flex">Go to Customers</Link>
           </div>
         ) : (
           <ul className="divide-y divide-slate-100">
@@ -180,9 +211,26 @@ export default function Invoices() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="font-bold text-slate-800 w-20 text-right">{fmtMoney(inv.amount)}</span>
+                    <button className="btn-ghost !h-8 !px-3" onClick={() => pdf(inv)}>
+                      <Download size={14} /> PDF
+                    </button>
                     <button className="btn-ghost !h-8 !px-3" onClick={() => print(inv)}>
                       <Printer size={14} /> Receipt
                     </button>
+                    {canEdit && (
+                      <button
+                        className="btn-ghost !h-8 !px-3"
+                        disabled={busy === inv.id || !inv.customer?.email}
+                        title={inv.customer?.email
+                          ? (invoiceEmailMode() === 'crm'
+                            ? `Email it to ${inv.customer.email}`
+                            : `Opens your email app addressed to ${inv.customer.email}`)
+                          : 'This customer has no email address on file'}
+                        onClick={() => email(inv)}
+                      >
+                        <Mail size={14} /> Email
+                      </button>
+                    )}
                     {canEdit && inv.status !== 'paid' && (
                       <button className="btn-ghost !h-8 !px-3 text-emerald-700" disabled={busy === inv.id} onClick={() => markPaid(inv)}>
                         <CheckCircle2 size={14} /> Paid
