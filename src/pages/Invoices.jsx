@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Receipt, Printer, Download, Mail, CheckCircle2, Trash2, Send, X, Search } from 'lucide-react'
+import { Receipt, Printer, Download, Mail, CheckCircle2, Trash2, Send, Undo2, X, Search } from 'lucide-react'
 import { db } from '../data'
 import { useAuth } from '../context/AuthContext'
 import { paymentsEnabled, createSquareInvoice } from '../lib/square'
@@ -51,6 +51,16 @@ export default function Invoices() {
     const sum = (a) => a.reduce((s, i) => s + Number(i.amount || 0), 0)
     return { paidCount: paid.length, paidSum: sum(paid), openCount: open.length, openSum: sum(open) }
   }, [invoices])
+
+  async function markUnpaid(inv) {
+    if (!confirm(`Mark ${receiptNumber(inv)} as UNPAID again?`)) return
+    setBusy(inv.id)
+    try {
+      await db.updateInvoice(inv.id, { status: 'unpaid', paid_date: null })
+      await load()
+      setToast(`${receiptNumber(inv)} is unpaid again.`)
+    } catch (e) { setToast(`Could not update it: ${e.message}`) } finally { setBusy(null) }
+  }
 
   async function markPaid(inv) {
     setBusy(inv.id)
@@ -234,6 +244,12 @@ export default function Invoices() {
                     {canEdit && inv.status !== 'paid' && (
                       <button className="btn-ghost !h-8 !px-3 text-emerald-700" disabled={busy === inv.id} onClick={() => markPaid(inv)}>
                         <CheckCircle2 size={14} /> Paid
+                      </button>
+                    )}
+                    {canEdit && inv.status === 'paid' && (
+                      <button className="btn-ghost !h-8 !px-3 text-slate-500" disabled={busy === inv.id}
+                        title="Pressed Paid by mistake? This puts it back." onClick={() => markUnpaid(inv)}>
+                        <Undo2 size={14} /> Undo paid
                       </button>
                     )}
                     {canEdit && paymentsEnabled() && inv.status === 'unpaid' && (

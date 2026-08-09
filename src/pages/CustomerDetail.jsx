@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Save, Trash2, Calculator, Bell, CalendarPlus, CheckCircle2, X, Receipt, Printer, Download, Mail } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, Calculator, Bell, CalendarPlus, CheckCircle2, X, Receipt, Printer, Download, Mail, Send, Undo2 } from 'lucide-react'
 import { db } from '../data'
 import { PIPELINE, RECURRING_OPTIONS, PAYMENT_METHODS, INVOICE_STATUSES } from '../lib/config'
 import { estimateQuote } from '../lib/pricing'
 import { nextDueFrom, fmtDate, fmtMoney, toISODate } from '../lib/dates'
 import { openReceipt, downloadReceiptPdf, receiptNumber } from '../lib/receipt'
 import { emailInvoice, invoiceEmailMode } from '../lib/invoiceEmail'
+import { paymentsEnabled, createSquareInvoice } from '../lib/square'
 import { remindersEnabled, smsEnabled, emailEnabled, sendReminder } from '../lib/notifications'
 import { segmentOf, classificationPatch } from '../lib/segments'
 import { SEGMENTS, SEGMENT_ORDER } from '../lib/config'
@@ -224,8 +225,35 @@ export default function CustomerDetail() {
     try {
       const saved = await db.updateInvoice(inv.id, { status: 'paid', paid_date: toISODate(new Date()) })
       setInvoices(invoices.map((i) => (i.id === inv.id ? saved : i)))
-      setToast({ msg: `${receiptNumber(inv)} marked paid.` })
+      setToast({ msg: `${receiptNumber(inv)} marked paid. Pressed by mistake? Use "Undo paid" on its row.` })
     } catch (e) { setToast({ msg: `Could not update it: ${e.message}` }) }
+  }
+
+  // The escape hatch for a mis-tap on Paid.
+  async function markInvoiceUnpaid(inv) {
+    if (!confirm(`Mark ${receiptNumber(inv)} as UNPAID again?`)) return
+    try {
+      const saved = await db.updateInvoice(inv.id, { status: 'unpaid', paid_date: null })
+      setInvoices(invoices.map((i) => (i.id === inv.id ? saved : i)))
+      setToast({ msg: `${receiptNumber(inv)} is unpaid again.` })
+    } catch (e) { setToast({ msg: `Could not update it: ${e.message}` }) }
+  }
+
+  // Send it to Square so the customer can pay by card. Kept identical to the
+  // Invoices screen so the button behaves the same wherever it's pressed.
+  async function sendSquare(inv) {
+    try {
+      const res = await createSquareInvoice({
+        customer: c, amount: inv.amount, description: inv.description,
+      })
+      const saved = await db.updateInvoice(inv.id, {
+        status: 'sent',
+        square_invoice_id: res?.square_invoice_id || null,
+        square_pay_url: res?.pay_url || null,
+      })
+      setInvoices(invoices.map((i) => (i.id === inv.id ? saved : i)))
+      setToast({ msg: `${receiptNumber(inv)} sent through Square — the customer can now pay by card. A Pay link button is on its row.` })
+    } catch (e) { setToast({ msg: `Square error: ${e.message}` }) }
   }
 
   function printReceipt(inv) {
@@ -598,9 +626,24 @@ export default function CustomerDetail() {
                         <Mail size={14} /> Email
                       </button>
                     )}
+                    {canEdit && paymentsEnabled() && inv.status === 'unpaid' && (
+                      <button className="btn-ghost !h-8 !px-3" title="Send a card-payable Square invoice"
+                        onClick={() => sendSquare(inv)}>
+                        <Send size={14} /> Square
+                      </button>
+                    )}
+                    {inv.square_pay_url && (
+                      <a className="btn-ghost !h-8 !px-3" href={inv.square_pay_url} target="_blank" rel="noreferrer">Pay link</a>
+                    )}
                     {canEdit && inv.status !== 'paid' && (
                       <button className="btn-ghost !h-8 !px-3 text-emerald-700" onClick={() => markInvoicePaid(inv)}>
                         <CheckCircle2 size={14} /> Paid
+                      </button>
+                    )}
+                    {canEdit && inv.status === 'paid' && (
+                      <button className="btn-ghost !h-8 !px-3 text-slate-500" title="Pressed Paid by mistake? This puts it back."
+                        onClick={() => markInvoiceUnpaid(inv)}>
+                        <Undo2 size={14} /> Undo paid
                       </button>
                     )}
                   </span>
