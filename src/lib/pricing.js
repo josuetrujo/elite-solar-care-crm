@@ -1,9 +1,9 @@
 // Quote calculator based on Elite Solar Care's documented pricing.
 // (See vault: 02-Sources/Company-Documents/Pricing.md)
-//   $8 per panel, $50 per story, $0.54 per mile,
+//   $10 per panel, $50 per story, $0.54 per mile,
 //   +$100 non-shingle roof, +$100 first-time customer.
 export const RATES = {
-  perPanel: 8,
+  perPanel: 10,
   perStory: 50,
   perMile: 0.54,
   nonShingleSurcharge: 100,

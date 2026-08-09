@@ -436,7 +436,7 @@ export default function CustomerDetail() {
         {/* Quote calculator */}
         <div className="card p-5 space-y-3">
           <h2 className="font-semibold flex items-center gap-2"><Calculator size={16} /> Quote estimate</h2>
-          <p className="text-xs text-slate-500">From your price list ($8/panel, $50/story, $0.54/mi, +$100 non-shingle, +$100 first-time).</p>
+          <p className="text-xs text-slate-500">From your price list ($10/panel, $50/story, $0.54/mi, +$100 non-shingle, +$100 first-time).</p>
           {FIELD('Travel distance (miles)', <input type="number" className="input" value={miles} onChange={(e) => setMiles(Number(e.target.value) || 0)} />)}
           <ul className="text-sm text-slate-600 space-y-1">
             {quote.lines.map((l, i) => (

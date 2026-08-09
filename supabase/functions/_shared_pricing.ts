@@ -1,6 +1,6 @@
 // Shared pricing rules — single source for quote-price and create-booking-request.
-// Owner's price list; percentages decided 2026-08-08.
-export const PER_PANEL = 8
+// Owner's price list; percentages decided 2026-08-08; $10/panel from 2026-08-09.
+export const PER_PANEL = 10
 export const PER_STORY = 50
 export const PER_MILE = 0.54
 export const LONG_HAUL_START = 20
