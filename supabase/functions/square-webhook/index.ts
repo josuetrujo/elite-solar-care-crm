@@ -1,16 +1,13 @@
-// Square → CRM: when a website checkout is PAID, this files the booking.
+// Square → CRM: payments and subscriptions from the website, filed automatically.
 //
-// Square calls this URL on payment events. Every request must carry a valid
-// HMAC signature made with our webhook signature key — anything unsigned or
-// mis-signed is rejected, so nobody can fake a "paid" booking by posting here.
+// Verified events only (HMAC, fail-closed). Handles:
+//   payment.updated        → one-time checkout paid → file customer + invoice
+//   subscription.created/  → link the Square subscription to our booking row
+//     subscription.updated   (and note cancellations on the CRM customer)
+//   invoice.payment_made   → subscription cycle charged → first one files the
+//                            customer; later ones add a paid invoice each cycle
 //
-// On a completed payment that matches a booking_payments row:
-//   1. row → status 'paid'
-//   2. customer created/updated in the CRM (note says PAID — schedule now)
-//   3. a paid invoice row is written so the money shows in Invoices/Reports
-//
-// Secrets: SQUARE_WEBHOOK_SIGNATURE_KEY (from the Square webhook subscription).
-// The registered notification URL must be EXACTLY:
+// Secrets: SQUARE_WEBHOOK_SIGNATURE_KEY. Registered URL must be EXACTLY:
 //   https://iplojxexxtutrllqptil.supabase.co/functions/v1/square-webhook
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -21,6 +18,13 @@ const ok = (body: unknown = { ok: true }) =>
   new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
 
 const digits = (v: unknown) => String(v ?? '').replace(/\D/g, '')
+const today = () => new Date().toISOString().slice(0, 10)
+const stampPT = () => new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })
+
+const PLAN_WORDS: Record<string, string> = {
+  monthly: 'every month', every_2: 'every 2 months', every_3: 'every 3 months',
+  every_4: 'every 4 months', every_6: 'every 6 months', every_12: 'once a year',
+}
 
 async function validSignature(rawBody: string, header: string | null): Promise<boolean> {
   const key = Deno.env.get('SQUARE_WEBHOOK_SIGNATURE_KEY')
@@ -31,55 +35,22 @@ async function validSignature(rawBody: string, header: string | null): Promise<b
   )
   const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(NOTIFICATION_URL + rawBody))
   const expected = btoa(String.fromCharCode(...new Uint8Array(sig)))
-  // Constant-time comparison.
   if (expected.length !== header.length) return false
   let diff = 0
   for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ header.charCodeAt(i)
   return diff === 0
 }
 
-Deno.serve(async (req) => {
-  if (req.method !== 'POST') return new Response('POST only', { status: 405 })
+function admin() {
+  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+}
 
-  const rawBody = await req.text()
-  const signed = await validSignature(rawBody, req.headers.get('x-square-hmacsha256-signature'))
-  if (!signed) return new Response('bad signature', { status: 401 })
-
-  let body: any
-  try { body = JSON.parse(rawBody) } catch { return ok({ ignored: 'unparseable' }) }
-
-  const payment = body?.data?.object?.payment
-  if (!payment || payment.status !== 'COMPLETED' || !payment.order_id) {
-    return ok({ ignored: body?.type || 'no-payment' })
-  }
-
-  const admin = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-  )
-
-  // Only rows this website created; anything else (in-person Square sales,
-  // CRM-sent invoices) is none of this function's business.
-  const { data: bp } = await admin.from('booking_payments')
-    .select('*').eq('square_order_id', payment.order_id).single()
-  if (!bp) return ok({ ignored: 'not a website booking' })
-  if (bp.status === 'paid') return ok({ already: true }) // webhook retries are normal
-
-  await admin.from('booking_payments').update({
-    status: 'paid',
-    square_payment_id: payment.id,
-    paid_at: new Date().toISOString(),
-  }).eq('id', bp.id)
-
-  const planLine = bp.plan_key === 'one_time'
-    ? `One-time cleaning — PAID $${bp.amount}`
-    : `${bp.plan_key.replace('_', ' ')} plan — first clean PAID $${bp.amount}, then $${bp.per_clean}/clean ` +
-      `(⚠️ enroll their recurring plan in the Square dashboard)`
-
-  const stamp = new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })
+// Create the CRM customer (or append to a phone match) and write the first
+// paid invoice. Shared by one-time payments and first subscription charges.
+async function fileFirstPayment(db: ReturnType<typeof admin>, bp: any, paidAmount: number, extraNote: string) {
   const note = [
-    `💰 PAID WEBSITE BOOKING — ${stamp} PT`,
-    planLine,
+    `💰 PAID WEBSITE BOOKING — ${stampPT()} PT`,
+    extraNote,
     `System: ${bp.panels} panels · ${bp.stories} stories · ${bp.roof} roof · faucet: ${bp.water}` +
       (bp.commercial ? ' · COMMERCIAL' : ''),
     `Address: ${bp.street_address}, ${bp.city}`,
@@ -88,24 +59,21 @@ Deno.serve(async (req) => {
     `➡️ Money is in Square. Contact them to schedule (site promised contact within a couple of business days).`,
   ].filter(Boolean).join('\n')
 
-  // Attach to an existing customer when the phone matches; otherwise create one.
   const last4 = String(bp.phone || '').slice(-4)
-  const { data: candidates } = await admin.from('customers')
+  const { data: candidates } = await db.from('customers')
     .select('id, phone, notes').like('phone', `%${last4}%`).limit(25)
-  const match = (candidates || []).find((c) => digits(c.phone).slice(-10) === String(bp.phone).slice(-10))
+  const match = (candidates || []).find((c: any) => digits(c.phone).slice(-10) === String(bp.phone).slice(-10))
 
-  let customerId: string
+  let customerId: string | undefined
   if (match) {
     customerId = match.id
-    // Existing contact: add the paid note and surface them in Callbacks, but
-    // leave their pipeline status alone — the owner sets it when scheduling.
-    await admin.from('customers').update({
+    await db.from('customers').update({
       notes: [match.notes, note].filter(Boolean).join('\n\n'),
       callback_at: new Date().toISOString(),
     }).eq('id', match.id)
   } else {
     const parts = String(bp.name || '').split(' ')
-    const { data: created } = await admin.from('customers').insert({
+    const { data: created } = await db.from('customers').insert({
       first_name: parts[0] || null,
       last_name: parts.slice(1).join(' ') || null,
       full_name: bp.name,
@@ -117,7 +85,7 @@ Deno.serve(async (req) => {
       panel_count: bp.panels,
       stories: Number(bp.stories) || null,
       roof_type: bp.roof,
-      quoted_amount: bp.amount,
+      quoted_amount: paidAmount,
       callback_at: new Date().toISOString(),
       notes: note,
     }).select('id').single()
@@ -125,20 +93,123 @@ Deno.serve(async (req) => {
   }
 
   if (customerId) {
-    await admin.from('booking_payments').update({ crm_customer_id: customerId }).eq('id', bp.id)
-    // The money is real — put it on the books as a paid invoice right away.
-    await admin.from('invoices').insert({
+    await db.from('booking_payments').update({ crm_customer_id: customerId }).eq('id', bp.id)
+    await db.from('invoices').insert({
       customer_id: customerId,
-      amount: bp.amount,
+      amount: paidAmount,
       status: 'paid',
-      paid_date: new Date().toISOString().slice(0, 10),
+      paid_date: today(),
       payment_method: 'card',
       description: bp.plan_key === 'one_time'
         ? 'Solar Panel Cleaning — one-time (paid online)'
-        : `Solar Panel Cleaning — first clean, ${bp.plan_key.replace('_', ' ')} plan (paid online)`,
-      notes: `Paid online via Square checkout. Square payment ${payment.id}.`,
+        : `Solar Panel Cleaning — first clean, ${PLAN_WORDS[bp.plan_key] || bp.plan_key} plan (paid online)`,
+      notes: 'Paid online via Square checkout.',
     })
   }
+  return customerId
+}
 
-  return ok({ processed: bp.id })
+Deno.serve(async (req) => {
+  if (req.method !== 'POST') return new Response('POST only', { status: 405 })
+
+  const rawBody = await req.text()
+  if (!(await validSignature(rawBody, req.headers.get('x-square-hmacsha256-signature')))) {
+    return new Response('bad signature', { status: 401 })
+  }
+
+  let body: any
+  try { body = JSON.parse(rawBody) } catch { return ok({ ignored: 'unparseable' }) }
+  const type = String(body?.type || '')
+  const db = admin()
+
+  // ---- one-time checkout paid --------------------------------------------
+  if (type === 'payment.updated' || type === 'payment.created') {
+    const payment = body?.data?.object?.payment
+    if (!payment || payment.status !== 'COMPLETED' || !payment.order_id) return ok({ ignored: type })
+
+    const { data: bp } = await db.from('booking_payments')
+      .select('*').eq('square_order_id', payment.order_id).single()
+    if (!bp) return ok({ ignored: 'not a website booking' })
+    if (bp.status === 'paid') return ok({ already: true })
+
+    await db.from('booking_payments').update({
+      status: 'paid', square_payment_id: payment.id, paid_at: new Date().toISOString(),
+    }).eq('id', bp.id)
+
+    const line = bp.plan_key === 'one_time'
+      ? `One-time cleaning — PAID $${bp.amount}`
+      : `${PLAN_WORDS[bp.plan_key] || bp.plan_key} plan — first clean PAID $${bp.amount}, then $${bp.per_clean}/clean auto-billed`
+    await fileFirstPayment(db, bp, Number(bp.amount), line)
+    return ok({ processed: bp.id })
+  }
+
+  // ---- subscription lifecycle ----------------------------------------------
+  if (type === 'subscription.created' || type === 'subscription.updated') {
+    const sub = body?.data?.object?.subscription
+    if (!sub?.plan_variation_id) return ok({ ignored: type })
+
+    const { data: bp } = await db.from('booking_payments')
+      .select('*').eq('square_plan_variation_id', sub.plan_variation_id).single()
+    if (!bp) return ok({ ignored: 'unknown variation' })
+
+    await db.from('booking_payments').update({
+      square_subscription_id: sub.id,
+      square_customer_id: sub.customer_id || null,
+    }).eq('id', bp.id)
+
+    // A cancellation deserves a loud note on the customer.
+    const status = String(sub.status || '')
+    if ((status === 'CANCELED' || status === 'DEACTIVATED') && bp.crm_customer_id) {
+      const { data: c } = await db.from('customers').select('notes').eq('id', bp.crm_customer_id).single()
+      await db.from('customers').update({
+        notes: [c?.notes, `⚠️ SUBSCRIPTION ${status} in Square — ${stampPT()} PT`].filter(Boolean).join('\n\n'),
+        callback_at: new Date().toISOString(),
+      }).eq('id', bp.crm_customer_id)
+    }
+    return ok({ linked: bp.id, status })
+  }
+
+  // ---- a subscription cycle was charged ------------------------------------
+  if (type === 'invoice.payment_made') {
+    const inv = body?.data?.object?.invoice
+    if (!inv?.subscription_id) return ok({ ignored: 'invoice without subscription' })
+
+    const { data: bp } = await db.from('booking_payments')
+      .select('*').eq('square_subscription_id', inv.subscription_id).single()
+    if (!bp) return ok({ ignored: 'unknown subscription' })
+
+    if (bp.status !== 'paid') {
+      // First charge of the subscription = the booking is paid.
+      await db.from('booking_payments').update({
+        status: 'paid', paid_at: new Date().toISOString(),
+      }).eq('id', bp.id)
+      const line = `${PLAN_WORDS[bp.plan_key] || bp.plan_key} plan — first clean PAID $${bp.amount}, ` +
+        `then $${bp.per_clean}/clean AUTO-BILLED by Square 🎉 (no manual enrollment needed)`
+      await fileFirstPayment(db, bp, Number(bp.amount), line)
+      return ok({ processed: bp.id, first: true })
+    }
+
+    // Later cycles: just put the money on the books.
+    if (bp.crm_customer_id) {
+      await db.from('invoices').insert({
+        customer_id: bp.crm_customer_id,
+        amount: Number(bp.per_clean || bp.amount),
+        status: 'paid',
+        paid_date: today(),
+        payment_method: 'card',
+        description: `Solar Panel Cleaning — plan cycle, ${PLAN_WORDS[bp.plan_key] || bp.plan_key} (auto-billed)`,
+        notes: `Auto-billed by Square subscription ${inv.subscription_id}.`,
+      })
+      // Their panels are due again — surface them for scheduling.
+      const { data: c } = await db.from('customers').select('notes').eq('id', bp.crm_customer_id).single()
+      await db.from('customers').update({
+        notes: [c?.notes, `🔁 PLAN CYCLE BILLED $${bp.per_clean} — schedule their next cleaning (${stampPT()} PT)`]
+          .filter(Boolean).join('\n\n'),
+        callback_at: new Date().toISOString(),
+      }).eq('id', bp.crm_customer_id)
+    }
+    return ok({ processed: bp.id, cycle: true })
+  }
+
+  return ok({ ignored: type })
 })
