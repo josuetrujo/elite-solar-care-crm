@@ -45,6 +45,22 @@ function admin() {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 }
 
+// Email via Resend. Silently skipped until RESEND_API_KEY exists, so this
+// function keeps filing bookings even if email is down or not yet set up.
+const OWNER_EMAIL = 'admin@elitesolarcare.com'
+async function sendEmail(to: string, subject: string, text: string) {
+  const key = Deno.env.get('RESEND_API_KEY')
+  if (!key) return
+  const from = Deno.env.get('REMINDER_FROM_EMAIL') || 'Elite Solar Care <admin@elitesolarcare.com>'
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to: [to], subject, text }),
+    })
+  } catch (_e) { /* never let email failures break payment filing */ }
+}
+
 // Create the CRM customer (or append to a phone match) and write the first
 // paid invoice. Shared by one-time payments and first subscription charges.
 async function fileFirstPayment(db: ReturnType<typeof admin>, bp: any, paidAmount: number, extraNote: string) {
@@ -140,6 +156,12 @@ Deno.serve(async (req) => {
       ? `One-time cleaning — PAID $${bp.amount}`
       : `${PLAN_WORDS[bp.plan_key] || bp.plan_key} plan — first clean PAID $${bp.amount}, then $${bp.per_clean}/clean auto-billed`
     await fileFirstPayment(db, bp, Number(bp.amount), line)
+    await sendEmail(OWNER_EMAIL,
+      `💰 Paid booking: ${bp.name} — $${bp.amount} (${bp.city})`,
+      `${line}\n\n${bp.name} · ${bp.phone} · ${bp.email}\n${bp.street_address}, ${bp.city}\n` +
+      `${bp.panels} panels · ${bp.stories} stories · ${bp.roof} roof · faucet: ${bp.water}\n` +
+      (bp.preferences ? `Notes: ${bp.preferences}\n` : '') +
+      `\nThey're in the CRM (Callbacks) — contact them within a couple of business days to schedule.\nhttps://app.elitesolarcare.com`)
     return ok({ processed: bp.id })
   }
 
@@ -165,6 +187,10 @@ Deno.serve(async (req) => {
         notes: [c?.notes, `⚠️ SUBSCRIPTION ${status} in Square — ${stampPT()} PT`].filter(Boolean).join('\n\n'),
         callback_at: new Date().toISOString(),
       }).eq('id', bp.crm_customer_id)
+      await sendEmail(OWNER_EMAIL,
+        `⚠️ Subscription canceled: ${bp.name} (${bp.city})`,
+        `${bp.name}'s ${PLAN_WORDS[bp.plan_key] || bp.plan_key} plan is ${status} in Square.\n` +
+        `${bp.phone} · ${bp.email}\n\nThey're flagged in the CRM — worth a call to see what happened.`)
     }
     return ok({ linked: bp.id, status })
   }
@@ -186,6 +212,24 @@ Deno.serve(async (req) => {
       const line = `${PLAN_WORDS[bp.plan_key] || bp.plan_key} plan — first clean PAID $${bp.amount}, ` +
         `then $${bp.per_clean}/clean AUTO-BILLED by Square 🎉 (no manual enrollment needed)`
       await fileFirstPayment(db, bp, Number(bp.amount), line)
+      await sendEmail(OWNER_EMAIL,
+        `🎉 NEW SUBSCRIBER: ${bp.name} — ${PLAN_WORDS[bp.plan_key] || bp.plan_key}, $${bp.per_clean}/clean (${bp.city})`,
+        `${line}\n\n${bp.name} · ${bp.phone} · ${bp.email}\n${bp.street_address}, ${bp.city}\n` +
+        `${bp.panels} panels · ${bp.stories} stories · ${bp.roof} roof\n` +
+        (bp.preferences ? `Notes: ${bp.preferences}\n` : '') +
+        `\nContact them within a couple of business days to schedule the first clean.\nhttps://app.elitesolarcare.com`)
+      // California ARL acknowledgment: restate the agreed terms + how to cancel.
+      await sendEmail(bp.email,
+        'Your Elite Solar Care cleaning plan is active',
+        `Hi ${String(bp.name || '').split(' ')[0]},\n\n` +
+        `Thank you for subscribing! Here's your plan, in writing:\n\n` +
+        `• Service: solar panel cleaning at ${bp.street_address}, ${bp.city}\n` +
+        `• First clean: $${bp.amount} (paid today — receipt comes from Square)\n` +
+        `• Then: $${bp.per_clean} automatically charged ${PLAN_WORDS[bp.plan_key] || ''}, until you cancel\n\n` +
+        `Cancel anytime: call or text (279) 245-0944, reply to this email, or use the ` +
+        `manage-subscription link in your Square emails.\n\n` +
+        `We'll contact you within a couple of business days to set your cleaning day.\n\n` +
+        `— Elite Solar Care · (279) 245-0944 · elitesolarcare.com`)
       return ok({ processed: bp.id, first: true })
     }
 
@@ -207,6 +251,10 @@ Deno.serve(async (req) => {
           .filter(Boolean).join('\n\n'),
         callback_at: new Date().toISOString(),
       }).eq('id', bp.crm_customer_id)
+      await sendEmail(OWNER_EMAIL,
+        `🔁 PLAN CYCLE BILLED: ${bp.name} — $${bp.per_clean} (${PLAN_WORDS[bp.plan_key] || bp.plan_key})`,
+        `${bp.name}'s card was auto-charged $${bp.per_clean}.\n${bp.phone} · ${bp.email}\n` +
+        `${bp.street_address}, ${bp.city}\n\nTheir panels are due — schedule the next cleaning.\nhttps://app.elitesolarcare.com`)
     }
     return ok({ processed: bp.id, cycle: true })
   }
