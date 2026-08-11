@@ -25,7 +25,7 @@ const json = (body: unknown, status = 200) =>
   })
 
 const BUSINESS_NAME = 'Elite Solar Care'
-const BUSINESS_PHONE = Deno.env.get('BUSINESS_PHONE') || '(916) 743-2227'
+const BUSINESS_PHONE = Deno.env.get('BUSINESS_PHONE') || '(888) 883-3008'
 
 function messageFor(kind: string, customer: Record<string, unknown>) {
   const name = String(customer.first_name || customer.full_name || 'there').split(' ')[0]

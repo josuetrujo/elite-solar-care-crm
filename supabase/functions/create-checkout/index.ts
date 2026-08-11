@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
       consent_text: isSubscription
         ? `Agreed at checkout: card automatically charged $${perClean} ${plan.label.toLowerCase()} ` +
           `after a first clean of $${firstClean}, continuing until cancelled. Cancel anytime: call/text ` +
-          `(279) 245-0944, email admin@elitesolarcare.com, or use the manage-subscription link in Square emails.`
+          `(888) 883-3008, email admin@elitesolarcare.com, or use the manage-subscription link in Square emails.`
         : null,
       consented_at: isSubscription ? new Date().toISOString() : null,
     }).select('id').single()

@@ -19,7 +19,7 @@ export function phoneKey(phone) {
   return d.length === 10 ? d : ''
 }
 
-// (916) 743-2227
+// (888) 883-3008
 export function formatPhone(phone) {
   const d = phoneKey(phone)
   if (!d) return phone || ''

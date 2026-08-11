@@ -27,7 +27,7 @@ const json = (body: unknown, status = 200) =>
   })
 
 const BUSINESS_NAME = 'Elite Solar Care'
-const BUSINESS_PHONE = Deno.env.get('BUSINESS_PHONE') || '(916) 743-2227'
+const BUSINESS_PHONE = Deno.env.get('BUSINESS_PHONE') || '(888) 883-3008'
 
 // A receipt is a big document; cap what a browser may hand us.
 const MAX_HTML = 200_000

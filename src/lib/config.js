@@ -75,7 +75,7 @@ export const BUSINESS = {
   name: 'ELITE SOLAR CARE LLC',
   tagline: 'Solar Panel Cleaning & Bird Proofing',
   serving: 'Serving Sacramento & the San Francisco Bay Area',
-  phone: '(916) 743-2227',
+  phone: '(888) 883-3008',
   email: 'admin@elitesolarcare.com',
   thanks: 'Thank you for choosing Elite Solar Care — Sacramento & the Bay Area',
 }

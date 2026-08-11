@@ -226,10 +226,10 @@ Deno.serve(async (req) => {
         `• Service: solar panel cleaning at ${bp.street_address}, ${bp.city}\n` +
         `• First clean: $${bp.amount} (paid today — receipt comes from Square)\n` +
         `• Then: $${bp.per_clean} automatically charged ${PLAN_WORDS[bp.plan_key] || ''}, until you cancel\n\n` +
-        `Cancel anytime: call or text (279) 245-0944, reply to this email, or use the ` +
+        `Cancel anytime: call or text (888) 883-3008, reply to this email, or use the ` +
         `manage-subscription link in your Square emails.\n\n` +
         `We'll contact you within a couple of business days to set your cleaning day.\n\n` +
-        `— Elite Solar Care · (279) 245-0944 · elitesolarcare.com`)
+        `— Elite Solar Care · (888) 883-3008 · elitesolarcare.com`)
       return ok({ processed: bp.id, first: true })
     }
 
